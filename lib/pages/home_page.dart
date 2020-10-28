@@ -2,7 +2,9 @@ import 'package:bandnames/constants/bands_data.dart';
 import 'package:bandnames/constants/common_page.dart';
 import 'package:bandnames/constants/ui.dart';
 import 'package:bandnames/models/band_model.dart';
+import 'package:bandnames/services/socket_service.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 class HomePage extends StatefulWidget {
   static final routeName = 'home';
@@ -13,12 +15,49 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   List<BandModel> _bands = BandModel.bandFromMapList(bandsData);
+  SocketService _socketService;
+
+  @override
+  void initState() {
+    final _socketService = Provider.of<SocketService>(context, listen: false);
+    _socketService.socket.on('active-bands', (data) {
+      this._bands = BandModel.bandFromMapList((data as List));
+      setState(() {});
+    });
+    super.initState();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _socketService = Provider.of<SocketService>(context);
+  }
+
+  @override
+  void dispose() {
+    _socketService.socket.off('active-bands');
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text('BandNames'),
+        actions: [
+          Padding(
+            padding: EdgeInsets.only(right: UI.padding),
+            child: _socketService.serverStatus == ServerStatus.online
+                ? Icon(
+                    Icons.check_circle,
+                    color: Theme.of(context).primaryColor,
+                  )
+                : Icon(
+                    Icons.offline_bolt,
+                    color: Colors.red,
+                  ),
+          )
+        ],
       ),
       body: _bandList(),
       floatingActionButton: FloatingActionButton(
@@ -57,8 +96,13 @@ class _HomePageState extends State<HomePage> {
         ),
         title: Text(band.name),
         trailing: Text(band.votes.toString()),
+        onTap: () => _aumentarVoto(band.id),
       ),
     );
+  }
+
+  void _aumentarVoto(String id) {
+    _socketService.socket.emit('vote-band', {'id': id});
   }
 
   void _addBandDialog() {
@@ -97,8 +141,7 @@ class _HomePageState extends State<HomePage> {
       id: DateTime.now().toString(),
       name: name,
     ));
-    setState(() {});
-    print(name);
+    _socketService.socket.emit('add-band', {'name': name});
     Navigator.of(context).pop();
   }
 }
