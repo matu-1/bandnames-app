@@ -4,6 +4,7 @@ import 'package:bandnames/constants/ui.dart';
 import 'package:bandnames/models/band_model.dart';
 import 'package:bandnames/services/socket_service.dart';
 import 'package:flutter/material.dart';
+import 'package:pie_chart/pie_chart.dart';
 import 'package:provider/provider.dart';
 
 class HomePage extends StatefulWidget {
@@ -59,7 +60,12 @@ class _HomePageState extends State<HomePage> {
           )
         ],
       ),
-      body: _bandList(),
+      body: Column(
+        children: [
+          _showGrafico(),
+          Expanded(child: _bandList()),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: _addBandDialog,
         child: Icon(Icons.add),
@@ -89,7 +95,7 @@ class _HomePageState extends State<HomePage> {
           style: TextStyle(color: Colors.white),
         ),
       ),
-      onDismissed: (direction) {},
+      onDismissed: (_) => _deleteBand(band.id),
       child: ListTile(
         leading: CircleAvatar(
           child: Text(band.initialName()),
@@ -99,6 +105,26 @@ class _HomePageState extends State<HomePage> {
         onTap: () => _aumentarVoto(band.id),
       ),
     );
+  }
+
+  Widget _showGrafico() {
+    final size = MediaQuery.of(context).size;
+    Map<String, double> dataMap = {};
+    _bands.forEach((band) {
+      dataMap[band.name] = band.votes.toDouble();
+    });
+
+    return Container(
+        padding: EdgeInsets.all(UI.padding),
+        height: size.height * 0.25,
+        child: PieChart(
+          dataMap: dataMap,
+          chartType: ChartType.ring,
+          chartValuesOptions: ChartValuesOptions(
+            showChartValueBackground: false,
+            showChartValuesInPercentage: true,
+          ),
+        ));
   }
 
   void _aumentarVoto(String id) {
@@ -137,11 +163,11 @@ class _HomePageState extends State<HomePage> {
   void _addNewBand(String name, GlobalKey<FormState> formKey) {
     if (!formKey.currentState.validate()) return;
     formKey.currentState.save();
-    _bands.add(new BandModel(
-      id: DateTime.now().toString(),
-      name: name,
-    ));
     _socketService.socket.emit('add-band', {'name': name});
     Navigator.of(context).pop();
+  }
+
+  void _deleteBand(String id) {
+    _socketService.socket.emit('delete-band', {'id': id});
   }
 }
